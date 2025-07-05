@@ -21,7 +21,7 @@ class ImageEmbedding:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize model or processor: {e}")
 
-    def preprocess_image(self, image_path: str) -> Image.Image:
+    def preprocess_image(self, image_path: str) -> Image.Image | None:
         """Load and convert image to RGB format if necessary."""
         try:
             image = Image.open(image_path)
@@ -34,9 +34,10 @@ class ImageEmbedding:
         """Embed an image and return a normalized feature vector."""
         try:
             if isinstance(image, str):
-                image = self.preprocess_image(image)
-                if not image:
-                    return None
+                processed_image = self.preprocess_image(image)
+                if not processed_image:
+                    raise ValueError(f"Failed to load image from path: {image}")
+                image = processed_image
 
             inputs = self.processor(images=image, return_tensors="pt")
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -48,4 +49,4 @@ class ImageEmbedding:
             return image_features.cpu().numpy().flatten()
         except Exception as e:
             print(f"Failed to embed image: {e}")
-            return None
+            raise RuntimeError(f"Failed to embed image: {e}")
