@@ -4,23 +4,29 @@ A beautiful and intuitive web application for searching similar durian disease a
 
 ## ✨ Features
 
-### 🎨 Beautiful UI/UX
-- **Modern Design**: Gradient backgrounds, smooth animations, and intuitive layout
+### 🎨 Simple UI/UX
+- **Clean Design**: Uses Streamlit's default styling for simplicity
 - **Responsive Layout**: Optimized for different screen sizes
-- **Interactive Elements**: Hover effects, progress bars, and visual feedback
+- **Interactive Elements**: Progress bars, metrics, and visual feedback
 
 ### 📊 Multi-Page Navigation
-1. **Dataset Overview Page**: 
+1. **Disease Report Page**: 
    - Count files in each disease category folder
    - Interactive charts and statistics
-   - Summary metrics with beautiful cards
+   - Summary metrics with clean cards
    - Top categories ranking
 
-2. **Image Search Page**:
+2. **Pest Report Page**:
+   - Count files in each pest category folder
+   - Interactive charts and statistics
+   - Summary metrics with clean cards
+   - Top categories ranking
+
+3. **Image Search Page**:
    - Upload and crop query images
    - Multiple embedding model selection
    - Real-time similarity search
-   - Beautiful result display with metadata
+   - Clean result display with metadata
 
 ### 🤖 Advanced Model Selection
 Choose from multiple state-of-the-art embedding models:
@@ -76,9 +82,15 @@ Update `src/config.py` to configure:
 
 ## 🎯 Usage Guide
 
-### Dataset Overview
-1. Navigate to "Dataset Overview" page
+### Disease Report
+1. Navigate to "Disease Report" page
 2. View file counts for each disease category
+3. Explore interactive charts and statistics
+4. Refresh counts as needed
+
+### Pest Report
+1. Navigate to "Pest Report" page
+2. View file counts for each pest category
 3. Explore interactive charts and statistics
 4. Refresh counts as needed
 
@@ -93,12 +105,12 @@ Update `src/config.py` to configure:
 
 ## 🎨 UI Components
 
-- **Gradient Headers**: Beautiful page titles with gradient backgrounds
-- **Metric Cards**: Summary statistics in attractive cards
-- **Upload Sections**: Styled file upload areas
-- **Result Cards**: Hoverable result displays
+- **Simple Headers**: Clean page titles using Streamlit's default styling
+- **Metric Displays**: Summary statistics using Streamlit's metric components
+- **Upload Areas**: Standard file upload components
+- **Result Grids**: Simple image result displays
 - **Progress Bars**: Visual similarity score indicators
-- **Interactive Charts**: Plotly-powered data visualizations
+- **Interactive Charts**: Plotly-powered data visualizations with color
 
 ## 🔧 Technical Stack
 

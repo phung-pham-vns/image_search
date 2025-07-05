@@ -22,89 +22,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for beautiful UI
-st.markdown(
-    """
-<style>
-    .main-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        margin-bottom: 2rem;
-        color: white;
-        text-align: center;
-    }
-    
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin: 0.5rem 0;
-    }
-    
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-    
-    .stButton > button {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        padding: 0.5rem 2rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    }
-    
-    .upload-section {
-        background: rgba(102, 126, 234, 0.1);
-        padding: 2rem;
-        border-radius: 15px;
-        border: 2px dashed #667eea;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    
-    .result-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-    
-    .result-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-    }
-    
-    .model-selector {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        border: 2px solid #e9ecef;
-        margin: 1rem 0;
-    }
-    
-    .page-indicator {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        display: inline-block;
-        margin-bottom: 1rem;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
 
 # Available embedding models
 EMBEDDING_MODELS = {
@@ -118,7 +35,7 @@ EMBEDDING_MODELS = {
 
 # Initialize session state
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "Dataset Overview"
+    st.session_state.current_page = "Disease Report"
 if "selected_model" not in st.session_state:
     st.session_state.selected_model = "SigLIP2 Base"
 if "embedder" not in st.session_state:
@@ -172,17 +89,10 @@ def count_files_in_directories(base_path: str) -> Dict[str, int]:
     return counts
 
 
-def create_dataset_overview_page():
-    """Page 1: Dataset Overview with file counts"""
-    st.markdown(
-        '<div class="main-header"><h1>🥭 Durian Dataset Overview</h1></div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div class="page-indicator">📊 Page 1: Dataset Statistics</div>',
-        unsafe_allow_html=True,
-    )
+def create_disease_report_page():
+    """Page 1: Disease Report with file counts"""
+    st.title("🥭 Durian Disease Report")
+    st.caption("📊 Disease Statistics")
 
     # File counting section
     diseases_path = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/original_dataset/diseases"
@@ -193,17 +103,21 @@ def create_dataset_overview_page():
         st.subheader("📁 Disease Categories File Count")
 
         if st.button("🔄 Refresh File Counts", use_container_width=True):
-            st.session_state.file_counts = count_files_in_directories(diseases_path)
+            st.session_state.disease_file_counts = count_files_in_directories(
+                diseases_path
+            )
 
-        if "file_counts" not in st.session_state:
-            st.session_state.file_counts = count_files_in_directories(diseases_path)
+        if "disease_file_counts" not in st.session_state:
+            st.session_state.disease_file_counts = count_files_in_directories(
+                diseases_path
+            )
 
-        if st.session_state.file_counts:
+        if st.session_state.disease_file_counts:
             # Create DataFrame for better display
             df = pd.DataFrame(
                 [
                     {"Category": name, "File Count": count}
-                    for name, count in st.session_state.file_counts.items()
+                    for name, count in st.session_state.disease_file_counts.items()
                 ]
             )
 
@@ -248,78 +162,142 @@ def create_dataset_overview_page():
     with col2:
         st.subheader("📈 Summary Statistics")
 
-        if st.session_state.file_counts:
-            total_files = sum(st.session_state.file_counts.values())
-            total_categories = len(st.session_state.file_counts)
+        if st.session_state.disease_file_counts:
+            total_files = sum(st.session_state.disease_file_counts.values())
+            total_categories = len(st.session_state.disease_file_counts)
             avg_files = total_files / total_categories if total_categories > 0 else 0
 
-            st.markdown(
-                f"""
-            <div class="metric-card">
-                <h3>📊 Total Images</h3>
-                <h2>{total_files:,}</h2>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("📊 Total Images", f"{total_files:,}")
+            with col_b:
+                st.metric("📁 Categories", f"{total_categories}")
 
-            st.markdown(
-                f"""
-            <div class="metric-card">
-                <h3>📁 Categories</h3>
-                <h2>{total_categories}</h2>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
-
-            st.markdown(
-                f"""
-            <div class="metric-card">
-                <h3>📏 Average per Category</h3>
-                <h2>{avg_files:.1f}</h2>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
+            st.metric("📏 Average per Category", f"{avg_files:.1f}")
 
             # Top categories
-            if st.session_state.file_counts:
+            if st.session_state.disease_file_counts:
                 top_categories = sorted(
-                    st.session_state.file_counts.items(),
+                    st.session_state.disease_file_counts.items(),
                     key=lambda x: x[1],
                     reverse=True,
                 )[:5]
 
                 st.subheader("🏆 Top 5 Categories")
                 for i, (category, count) in enumerate(top_categories, 1):
-                    st.markdown(f"**{i}.** {category}: **{count}** images")
+                    st.metric(f"{i}. {category}", f"{count} images")
+
+
+def create_pest_report_page():
+    """Page 2: Pest Report with file counts"""
+    st.title("🥭 Durian Pest Report")
+    st.caption("📊 Pest Statistics")
+
+    # File counting section
+    pests_path = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/original_dataset/pests"
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("📁 Pest Categories File Count")
+
+        if st.button("🔄 Refresh File Counts", use_container_width=True):
+            st.session_state.pest_file_counts = count_files_in_directories(pests_path)
+
+        if "pest_file_counts" not in st.session_state:
+            st.session_state.pest_file_counts = count_files_in_directories(pests_path)
+
+        if st.session_state.pest_file_counts:
+            # Create DataFrame for better display
+            df = pd.DataFrame(
+                [
+                    {"Category": name, "File Count": count}
+                    for name, count in st.session_state.pest_file_counts.items()
+                ]
+            )
+
+            # Sort by file count descending
+            df = df.sort_values("File Count", ascending=False)
+
+            # Display as a beautiful table
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Category": st.column_config.TextColumn(
+                        "Pest Category", width="medium"
+                    ),
+                    "File Count": st.column_config.NumberColumn(
+                        "Number of Images", width="small"
+                    ),
+                },
+            )
+
+            # Create visualization
+            fig = px.bar(
+                df,
+                x="File Count",
+                y="Category",
+                orientation="h",
+                title="Distribution of Images Across Pest Categories",
+                color="File Count",
+                color_continuous_scale="viridis",
+            )
+            fig.update_layout(
+                height=600,
+                showlegend=False,
+                xaxis_title="Number of Images",
+                yaxis_title="Pest Category",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("No pest categories found or directory doesn't exist.")
+
+    with col2:
+        st.subheader("📈 Summary Statistics")
+
+        if st.session_state.pest_file_counts:
+            total_files = sum(st.session_state.pest_file_counts.values())
+            total_categories = len(st.session_state.pest_file_counts)
+            avg_files = total_files / total_categories if total_categories > 0 else 0
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("📊 Total Images", f"{total_files:,}")
+            with col_b:
+                st.metric("📁 Categories", f"{total_categories}")
+
+            st.metric("📏 Average per Category", f"{avg_files:.1f}")
+
+            # Top categories
+            if st.session_state.pest_file_counts:
+                top_categories = sorted(
+                    st.session_state.pest_file_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True,
+                )[:5]
+
+                st.subheader("🏆 Top 5 Categories")
+                for i, (category, count) in enumerate(top_categories, 1):
+                    st.metric(f"{i}. {category}", f"{count} images")
 
 
 def create_search_page():
-    """Page 2: Image Search with enhanced UI"""
-    st.markdown(
-        '<div class="main-header"><h1>🔍 Durian Image Similarity Search</h1></div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div class="page-indicator">🔍 Page 2: Image Search</div>',
-        unsafe_allow_html=True,
-    )
+    """Page 3: Image Search with enhanced UI"""
+    st.title("🔍 Durian Image Similarity Search")
+    st.caption("🔍 Image Search")
 
     # Model selection in sidebar
     with st.sidebar:
         st.subheader("🤖 Model Configuration")
 
-        st.markdown('<div class="model-selector">', unsafe_allow_html=True)
         selected_model = st.selectbox(
             "Select Embedding Model",
             options=list(EMBEDDING_MODELS.keys()),
             index=list(EMBEDDING_MODELS.keys()).index(st.session_state.selected_model),
             help="Choose the embedding model for image similarity search",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         if selected_model != st.session_state.selected_model:
             st.session_state.selected_model = selected_model
@@ -366,13 +344,11 @@ def create_search_page():
     with col1:
         st.subheader("📤 Upload Query Image")
 
-        st.markdown('<div class="upload-section">', unsafe_allow_html=True)
         uploaded_file = st.file_uploader(
             "Choose an image file",
             type=["jpg", "jpeg", "png", "bmp"],
             help="Upload an image to find similar images in the dataset",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         if uploaded_file:
             # Save uploaded file temporarily
@@ -401,7 +377,7 @@ def create_search_page():
 
             cropped_img = st_cropper(
                 resized_img,
-                box_color="#667eea",
+                box_color="#FF0000",
                 realtime_update=True,
                 aspect_ratio=(16, 9),
             )
@@ -477,7 +453,7 @@ def perform_search(query_image: Image.Image) -> List[Dict]:
 
 
 def display_search_results(results: List[Dict]):
-    """Display search results in a beautiful grid"""
+    """Display search results in a simple grid"""
     if not results:
         st.warning("No results found")
         return
@@ -489,8 +465,6 @@ def display_search_results(results: List[Dict]):
         col_idx = i % 3
 
         with cols[col_idx]:
-            st.markdown('<div class="result-card">', unsafe_allow_html=True)
-
             # Display image
             st.image(
                 result["image"], use_container_width=True, caption=result["filename"]
@@ -510,14 +484,12 @@ def display_search_results(results: List[Dict]):
 
                 st.caption(f"Score: `{result['score']:.3f}`")
 
-            st.markdown("</div>", unsafe_allow_html=True)
-
 
 # Navigation
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧭 Navigation")
 
-page_options = ["Dataset Overview", "Image Search"]
+page_options = ["Disease Report", "Pest Report", "Image Search"]
 current_page = st.sidebar.selectbox(
     "Select Page",
     options=page_options,
@@ -529,8 +501,10 @@ if current_page != st.session_state.current_page:
     st.rerun()
 
 # Display current page
-if st.session_state.current_page == "Dataset Overview":
-    create_dataset_overview_page()
+if st.session_state.current_page == "Disease Report":
+    create_disease_report_page()
+elif st.session_state.current_page == "Pest Report":
+    create_pest_report_page()
 elif st.session_state.current_page == "Image Search":
     create_search_page()
 
