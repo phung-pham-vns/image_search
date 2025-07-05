@@ -6,3 +6,4 @@ qdrant_client
 transformers
 pandas
 plotly
+tqdm

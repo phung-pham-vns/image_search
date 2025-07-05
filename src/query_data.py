@@ -12,10 +12,13 @@ if __name__ == "__main__":
     vector = embedder.embed(image_path)
 
     hits = store.query(
-        collection_name=cfg.COLLECTION_NAME,
+        collection_name=f"{cfg.COLLECTION_NAME_PREFIX}_disease",
         query_vector=vector,
         top_k=cfg.TOP_K,
     )
 
     for hit in hits:
-        print(hit.payload["english_translation"], "score:", hit.score)
+        if hit.payload and "english_translation" in hit.payload:
+            print(hit.payload["english_translation"], "score:", hit.score)
+        else:
+            print("No translation available", "score:", hit.score)
