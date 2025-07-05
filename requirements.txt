@@ -1,0 +1,8 @@
+torch
+Pillow
+streamlit
+streamlit_cropper
+qdrant_client
+transformers
+pandas
+plotly
