@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from tqdm import tqdm
 import numpy as np
 
-from config import Config
-from embeddings.image_embedding import ImageEmbedding
-from vector_stores.qdrant import QdrantVectorStore
+from .config import Config
+from .embeddings.image_embedding import ImageEmbedding
+from .vector_stores.qdrant import QdrantVectorStore
 
 
 @dataclass
@@ -42,6 +42,10 @@ class DataIngester:
         self.logger = self._setup_logging()
         self.embedder = None
         self.store = None
+        # Validate configuration
+        self._validate_config()
+        # Initialize components
+        self._initialize_components()
 
     def _setup_logging(self) -> logging.Logger:
         """Set up logging configuration."""
@@ -340,12 +344,6 @@ class DataIngester:
         self.logger.info("Starting data ingestion process")
 
         try:
-            # Validate configuration
-            self._validate_config()
-
-            # Initialize components
-            self._initialize_components()
-
             # Process each category
             for category in categories:
                 try:
