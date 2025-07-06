@@ -14,6 +14,7 @@ from src.config import Config
 from src.vector_stores.qdrant import QdrantVectorStore
 from src.embeddings.image_embedding import ImageEmbedding
 from src.ingest_data import DataIngester
+from src.generate import generate_answer_from_retrieval
 
 # Page configuration
 st.set_page_config(
@@ -666,16 +667,10 @@ def create_search_page():
     st.title("🔍 Durian Image Similarity Search")
     st.caption("🔍 Image Search")
 
-    # Search parameters
-    st.subheader("⚙️ Search Parameters")
-
-    search_category = st.radio(
-        "Search Category",
-        options=["disease", "pest"],
-        index=0 if st.session_state.get("category", "disease") == "disease" else 1,
-        help="Choose whether to search for disease or pest",
-    )
-    st.session_state.category = search_category
+    # Use sidebar values
+    search_category = st.session_state.get("category", "disease")
+    top_k = st.session_state.get("top_k", 5)
+    distance_metric = st.session_state.get("distance_metric", "cosine")
 
     # Initialize components
     if not initialize_components():
@@ -733,6 +728,7 @@ def create_search_page():
                 "🔍 Search Similar Images", use_container_width=True, type="primary"
             ):
                 st.session_state.search_results = perform_search(cropped_img)
+                st.session_state.llm_answer = None  # Reset any previous answer
                 st.rerun()
 
     with col2:
@@ -740,6 +736,37 @@ def create_search_page():
 
         if "search_results" in st.session_state and st.session_state.search_results:
             display_search_results(st.session_state.search_results)
+
+            # --- New: Question block for LLM answer ---
+            st.markdown("---")
+            st.subheader("💬 Ask a Question about the Results")
+            user_question = st.text_input(
+                "Ask a question about the retrieved images (e.g., 'What is the most common disease?')",
+                key="llm_question_input",
+            )
+            if user_question:
+                # Prepare metadata for LLM
+                retrieved_metadata = []
+                for result in st.session_state.search_results:
+                    # You may want to include more fields as needed
+                    retrieved_metadata.append(
+                        {
+                            "label": result.get("label"),
+                            "filename": result.get("filename"),
+                            # Add more fields if available
+                        }
+                    )
+                # Call LLM answer generator
+                with st.spinner("Generating answer..."):
+                    answer = generate_answer_from_retrieval(
+                        user_question,
+                        retrieved_metadata,
+                        # Optionally pass vectors if you want
+                    )
+                    st.session_state.llm_answer = answer
+            # Display answer if available
+            if st.session_state.get("llm_answer"):
+                st.markdown(f"""**Answer:**\n\n{st.session_state.llm_answer}""")
         else:
             st.info(
                 "👆 Upload an image and click 'Search Similar Images' to see results"
@@ -774,9 +801,10 @@ def perform_search(query_image: Image.Image) -> List[Dict]:
         # Process results
         processed_results = []
         for hit in results:
-            img_name = hit.payload["image_name"]
-            label = hit.payload[st.session_state.category]
+            img_name = hit.payload.get("image_name")
+            label = hit.payload.get(st.session_state.category)
             score = hit.score
+            payload = hit.payload
 
             # Load result image
             result_img_path = image_dir / img_name
@@ -788,6 +816,7 @@ def perform_search(query_image: Image.Image) -> List[Dict]:
                         "label": label,
                         "score": score,
                         "filename": img_name,
+                        "payload": payload,
                     }
                 )
 
@@ -816,19 +845,173 @@ def display_search_results(results: List[Dict]):
                 result["image"], use_container_width=True, caption=result["filename"]
             )
 
-            if st.session_state.display_metadata:
-                # Display metadata
-                st.markdown(
-                    f"**{st.session_state.category.capitalize()}:** {result['label']}"
-                )
+            payload = result.get("payload", {})
+            # Show local name, scientific name, english name, and similarity
+            local_name = (
+                payload.get("disease")
+                or payload.get("pest")
+                or payload.get("local_name")
+            )
+            scientific_name = payload.get("scientific_name")
+            english_name = payload.get("english_translation") or payload.get(
+                "english_name"
+            )
+            similarity = result["score"]
 
-                # Create a progress bar for similarity score
-                score_percentage = result["score"] * 100
-                st.progress(
-                    result["score"], text=f"Similarity: {score_percentage:.1f}%"
-                )
+            st.markdown(f"**Local Name:** {local_name if local_name else '-'}")
+            st.markdown(
+                f"**Scientific Name:** {scientific_name if scientific_name else '-'}"
+            )
+            st.markdown(f"**English Name:** {english_name if english_name else '-'}")
+            st.markdown(f"**Similarity:** `{similarity:.3f}`")
 
-                st.caption(f"Score: `{result['score']:.3f}`")
+            # Expander for all metadata
+            with st.expander("Show all metadata"):
+                for k, v in payload.items():
+                    st.markdown(f"**{k}:** {v}")
+
+
+def create_ask_with_image_page():
+    """Page: Ask with Image (upload image, ask a question, get an answer, multi-turn)"""
+    st.title("🖼️ Ask with Image")
+    st.caption(
+        "Upload an image and have a multi-turn conversation about it. You can set the top result as the focus for follow-up questions."
+    )
+
+    # Initialize session state for chat and focus
+    if "ask_image_chat_history" not in st.session_state:
+        st.session_state.ask_image_chat_history = (
+            []
+        )  # List of dicts: {question, answer}
+    if "ask_image_focus_metadata" not in st.session_state:
+        st.session_state.ask_image_focus_metadata = None
+    if "ask_image_last_results" not in st.session_state:
+        st.session_state.ask_image_last_results = []
+
+    # Upload image
+    uploaded_file = st.file_uploader(
+        "Upload an image to ask about",
+        type=["jpg", "jpeg", "png", "bmp"],
+        key="ask_image_uploader",
+    )
+
+    if uploaded_file:
+        # Save uploaded file temporarily
+        with open("figures/temp_ask.jpg", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        # Show uploaded image
+        st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
+
+        # Retrieve similar images and metadata (only once per upload)
+        if not st.session_state.ask_image_last_results:
+            if not initialize_components():
+                st.error(
+                    "Failed to initialize the embedding model. Please check your configuration."
+                )
+                return
+            embedder = st.session_state.embedder
+            query_img = embedder.preprocess_image(uploaded_file)
+            query_embedding = embedder.embed(query_img)
+            if query_embedding is None:
+                st.error("Failed to generate embedding for the uploaded image.")
+                return
+            category = st.session_state.get("category", "disease")
+            top_k = st.session_state.get("top_k", 5)
+            if category == "disease":
+                collection_name = f"{st.session_state.collection_name_prefix}_disease"
+            else:
+                collection_name = f"{st.session_state.collection_name_prefix}_pest"
+            results = st.session_state.store.query(
+                collection_name=collection_name,
+                query_vector=query_embedding,
+                top_k=top_k,
+            )
+            st.session_state.ask_image_last_results = results
+        else:
+            results = st.session_state.ask_image_last_results
+
+        # Show top result and allow setting as focus
+        if results:
+            top_result = results[0]
+            top_label = (
+                top_result.payload.get("disease")
+                or top_result.payload.get("pest")
+                or top_result.payload.get("local_name")
+            )
+            st.markdown(f"**Top Result:** {top_label if top_label else '-'}")
+            if st.button("Set as Focus (for follow-up questions)", key="set_focus_btn"):
+                st.session_state.ask_image_focus_metadata = top_result.payload
+                st.success("Focus set! Follow-up questions will use this as context.")
+
+        # Show chat history
+        st.markdown("---")
+        st.subheader("💬 Conversation")
+        for turn in st.session_state.ask_image_chat_history:
+            st.markdown(f"**You:** {turn['question']}")
+            st.markdown(f"**Answer:** {turn['answer']}")
+            st.markdown("---")
+
+        # Ask a question
+        user_question = st.text_input(
+            "Ask a question about this image (multi-turn supported)",
+            key="ask_image_question_input",
+        )
+
+        if user_question:
+            # Prepare context for LLM
+            conversation = st.session_state.ask_image_chat_history
+            focus_metadata = st.session_state.ask_image_focus_metadata
+            # Compose context: focus metadata (if set) + retrieved metadata
+            if focus_metadata:
+                context_metadata = [focus_metadata]
+            else:
+                context_metadata = [hit.payload for hit in results]
+            # Compose conversation history as a string
+            chat_history_str = "\n".join(
+                [f"Q: {turn['question']}\nA: {turn['answer']}" for turn in conversation]
+            )
+            # Compose prompt for LLM
+            prompt = (
+                f"Conversation so far:\n{chat_history_str}\n\n"
+                f"User's new question: {user_question}"
+            )
+            # Generate answer
+            with st.spinner("Generating answer..."):
+                answer = generate_answer_from_retrieval(
+                    prompt,
+                    context_metadata,
+                )
+            # Add to chat history
+            st.session_state.ask_image_chat_history.append(
+                {
+                    "question": user_question,
+                    "answer": answer,
+                }
+            )
+            st.rerun()
+
+        # Optionally show retrieved images/metadata
+        with st.expander("Show retrieved similar images and metadata"):
+            for i, hit in enumerate(results):
+                st.markdown(f"**Result {i+1}:**")
+                img_name = hit.payload.get("image_name")
+                category = st.session_state.get("category", "disease")
+                if category == "disease":
+                    image_dir = Path(Config.DATASET_DIR) / "disease" / "images"
+                else:
+                    image_dir = Path(Config.DATASET_DIR) / "pest" / "images"
+                img_path = image_dir / img_name if img_name else None
+                if img_path and img_path.exists():
+                    st.image(str(img_path), width=200)
+                for k, v in hit.payload.items():
+                    st.markdown(f"**{k}:** {v}")
+
+    else:
+        # Reset state if no image is uploaded
+        st.session_state.ask_image_chat_history = []
+        st.session_state.ask_image_focus_metadata = None
+        st.session_state.ask_image_last_results = []
 
 
 # Create sidebar settings
@@ -838,7 +1021,13 @@ create_sidebar_settings()
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧭 Navigation")
 
-page_options = ["Data Ingestion", "Disease Report", "Pest Report", "Image Search"]
+page_options = [
+    "Data Ingestion",
+    "Disease Report",
+    "Pest Report",
+    "Image Search",
+    "Ask with Image",
+]
 current_page = st.sidebar.selectbox(
     "Select Page",
     options=page_options,
@@ -849,6 +1038,39 @@ if current_page != st.session_state.current_page:
     st.session_state.current_page = current_page
     st.rerun()
 
+# --- Add search parameters to sidebar for Image Search page ---
+if st.session_state.current_page == "Image Search":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔍 Search Parameters")
+    # Category
+    search_category = st.sidebar.radio(
+        "Search Category",
+        options=["disease", "pest"],
+        index=0 if st.session_state.get("category", "disease") == "disease" else 1,
+        help="Choose whether to search for disease or pest",
+        key="sidebar_search_category",
+    )
+    st.session_state.category = search_category
+    # Top K
+    top_k = st.sidebar.slider(
+        "Top K Results",
+        min_value=1,
+        max_value=20,
+        value=st.session_state.get("top_k", 5),
+        help="Number of similar images to return",
+        key="sidebar_top_k",
+    )
+    st.session_state.top_k = top_k
+    # Distance metric
+    distance_metric = st.sidebar.selectbox(
+        "Distance Metric",
+        options=["cosine", "euclid", "dot", "manhattan"],
+        index=0,
+        help="Distance metric for vector similarity",
+        key="sidebar_distance_metric",
+    )
+    st.session_state.distance_metric = distance_metric
+
 # Display current page
 if st.session_state.current_page == "Data Ingestion":
     create_data_ingestion_page()
@@ -858,6 +1080,8 @@ elif st.session_state.current_page == "Pest Report":
     create_pest_report_page()
 elif st.session_state.current_page == "Image Search":
     create_search_page()
+elif st.session_state.current_page == "Ask with Image":
+    create_ask_with_image_page()
 
 # Footer
 st.markdown("---")

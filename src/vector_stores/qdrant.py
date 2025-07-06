@@ -96,7 +96,10 @@ class QdrantVectorStore:
             )
             points.append(point)
 
-        self.client.upsert(collection_name=collection_name, points=points)
+        self.client.upsert(
+            collection_name=collection_name,
+            points=points,
+        )
 
     def query(
         self,

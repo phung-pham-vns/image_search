@@ -3,50 +3,114 @@ import numpy as np
 import torch.nn.functional as F
 
 from PIL import Image
-from typing import Union
+from typing import Union, Optional
 from transformers import AutoProcessor, AutoModel
 
 
+# Base class for all embedders
+class BaseImageEmbedder:
+    def __init__(
+        self, model_name_or_path: str, device: Union[str, torch.device] = "cpu"
+    ):
+        self.model_name_or_path = model_name_or_path
+        self.device = torch.device(device)
+
+    def preprocess_image(self, image: str | Image.Image) -> Optional[Image.Image]:
+        if isinstance(image, str):
+            try:
+                image = Image.open(image)
+            except Exception as e:
+                print(f"Error processing image at '{image}': {e}")
+                return None
+        # Handle UploadedFile objects from Streamlit
+        elif hasattr(image, "read"):  # UploadedFile has a read method
+            try:
+                image = Image.open(image)
+            except Exception as e:
+                print(f"Error processing uploaded file: {e}")
+                return None
+        return image.convert("RGB") if image.mode != "RGB" else image
+
+    def embed(self, image: str | Image.Image) -> np.ndarray:
+        raise NotImplementedError
+
+
+# CLIP implementation
+class CLIPEmbedder(BaseImageEmbedder):
+    def __init__(
+        self, model_name_or_path: str, device: Union[str, torch.device] = "cpu"
+    ):
+        super().__init__(model_name_or_path, device)
+        try:
+            self.processor = AutoProcessor.from_pretrained(model_name_or_path)
+            self.model = AutoModel.from_pretrained(model_name_or_path)
+            self.model.to(self.device).eval()
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize CLIP model: {e}")
+
+    def embed(self, image: str | Image.Image) -> np.ndarray:
+        image = self.preprocess_image(image)
+        if image is None:
+            raise ValueError("Invalid image input for embedding.")
+        inputs = self.processor(images=image, return_tensors="pt")
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        with torch.no_grad():
+            image_features = self.model.get_image_features(**inputs)
+            image_features = F.normalize(image_features, p=2, dim=1)
+        return image_features.cpu().numpy().flatten()
+
+
+# SigLIP implementation (uses same interface as CLIP)
+class SigLIPEmbedder(CLIPEmbedder):
+    pass  # For now, SigLIP models are loaded the same way as CLIP
+
+
+# DINOv2 implementation
+class DINOv2Embedder(BaseImageEmbedder):
+    def __init__(
+        self, model_name_or_path: str, device: Union[str, torch.device] = "cpu"
+    ):
+        super().__init__(model_name_or_path, device)
+        try:
+            self.processor = AutoProcessor.from_pretrained(model_name_or_path)
+            self.model = AutoModel.from_pretrained(model_name_or_path)
+            self.model.to(self.device).eval()
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize DINOv2 model: {e}")
+
+    def embed(self, image: str | Image.Image) -> np.ndarray:
+        image = self.preprocess_image(image)
+        if image is None:
+            raise ValueError("Invalid image input for embedding.")
+        inputs = self.processor(images=image, return_tensors="pt")
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        with torch.no_grad():
+            image_features = self.model(**inputs).last_hidden_state[:, 0]
+            image_features = F.normalize(image_features, p=2, dim=1)
+        return image_features.cpu().numpy().flatten()
+
+
+# Main selector class
 class ImageEmbedding:
     def __init__(
         self,
         model_name_or_path: str = "google/siglip2-base-patch16-224",
         device: Union[str, torch.device] = "cpu",
     ):
-        try:
-            self.device = torch.device(device)
-            self.processor = AutoProcessor.from_pretrained(model_name_or_path)
-            self.model = AutoModel.from_pretrained(model_name_or_path)
-            self.model.to(self.device).eval()
-        except Exception as e:
-            raise RuntimeError(f"Failed to initialize model or processor: {e}")
+        # Model selection logic
+        model_name = model_name_or_path.lower()
+        if any(x in model_name for x in ["clip", "openai/clip"]):
+            self.backend = CLIPEmbedder(model_name_or_path, device)
+        elif "siglip" in model_name:
+            self.backend = SigLIPEmbedder(model_name_or_path, device)
+        elif "dino" in model_name:
+            self.backend = DINOv2Embedder(model_name_or_path, device)
+        else:
+            # Default to CLIP-like interface for unknown models
+            self.backend = CLIPEmbedder(model_name_or_path, device)
 
-    def preprocess_image(self, image_path: str) -> Image.Image | None:
-        """Load and convert image to RGB format if necessary."""
-        try:
-            image = Image.open(image_path)
-            return image.convert("RGB") if image.mode != "RGB" else image
-        except Exception as e:
-            print(f"Error processing image at '{image_path}': {e}")
-            return None
+    def preprocess_image(self, image: str | Image.Image) -> Optional[Image.Image]:
+        return self.backend.preprocess_image(image)
 
     def embed(self, image: str | Image.Image) -> np.ndarray:
-        """Embed an image and return a normalized feature vector."""
-        try:
-            if isinstance(image, str):
-                processed_image = self.preprocess_image(image)
-                if not processed_image:
-                    raise ValueError(f"Failed to load image from path: {image}")
-                image = processed_image
-
-            inputs = self.processor(images=image, return_tensors="pt")
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-            with torch.no_grad():
-                image_features = self.model.get_image_features(**inputs)
-                image_features = F.normalize(image_features, p=2, dim=1)
-
-            return image_features.cpu().numpy().flatten()
-        except Exception as e:
-            print(f"Failed to embed image: {e}")
-            raise RuntimeError(f"Failed to embed image: {e}")
+        return self.backend.embed(image)

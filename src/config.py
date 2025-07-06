@@ -6,6 +6,7 @@ class Config:
     TOP_K = 3
     DEVICE = "cpu"
     EMBEDDING_NAME = "google/siglip2-base-patch16-224"
+    MODEL_NAME_OR_PATH = "google/siglip2-base-patch16-224"
     EMEBDDING_DIM = 768
     DATASET_DIR = (
         "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset"

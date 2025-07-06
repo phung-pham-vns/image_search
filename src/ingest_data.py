@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Tuple, Any, Union, cast
 from dataclasses import dataclass
 from tqdm import tqdm
 import numpy as np
+import re
 
 from .config import Config
 from .embeddings.image_embedding import ImageEmbedding
@@ -64,14 +65,23 @@ class DataIngester:
         if not self.config.QDRANT_URI:
             raise DataIngestionError("QDRANT_URI is not configured")
 
-        if not self.config.EMBEDDING_NAME:
-            raise DataIngestionError("EMBEDDING_NAME is not configured")
+        if not self.config.MODEL_NAME_OR_PATH:
+            raise DataIngestionError("MODEL_NAME_OR_PATH is not configured")
+
+    def _short_model_name(self, model_name_or_path: str) -> str:
+        """Sanitize and shorten model name for use in collection name."""
+        # Remove common path/prefixes and non-alphanumeric
+        name = model_name_or_path.lower()
+        name = re.sub(r"^.*[\\/]|openai/|google/|facebook/", "", name)
+        name = re.sub(r"[^a-z0-9]+", "_", name)
+        return name.strip("_")
 
     def _initialize_components(self) -> None:
         """Initialize embedding model and vector store."""
         try:
             self.embedder = ImageEmbedding(
-                model_name_or_path=self.config.EMBEDDING_NAME, device=self.config.DEVICE
+                model_name_or_path=self.config.MODEL_NAME_OR_PATH,
+                device=self.config.DEVICE,
             )
             self.store = QdrantVectorStore(uri=self.config.QDRANT_URI)
             self.logger.info(
@@ -236,6 +246,11 @@ class DataIngester:
 
         return vectors, payloads, ids
 
+    def _collection_name(self, category: str) -> str:
+        """Generate a unique collection name including model info."""
+        model_part = self._short_model_name(self.config.MODEL_NAME_OR_PATH)
+        return f"{self.config.COLLECTION_NAME_PREFIX}_{category}_{model_part}"
+
     def _create_collection(self, category: str) -> None:
         """
         Create vector store collection for the given category.
@@ -243,7 +258,7 @@ class DataIngester:
         Args:
             category: Category name for the collection
         """
-        collection_name = f"{self.config.COLLECTION_NAME_PREFIX}_{category}"
+        collection_name = self._collection_name(category)
 
         try:
             if self.store is None:
@@ -275,7 +290,7 @@ class DataIngester:
             payloads: List of metadata payloads
             ids: List of image IDs
         """
-        collection_name = f"{self.config.COLLECTION_NAME_PREFIX}_{category}"
+        collection_name = self._collection_name(category)
 
         try:
             if self.store is None:
