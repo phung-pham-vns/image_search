@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import streamlit_cropper
 from PIL import Image
@@ -6,9 +7,17 @@ from typing import List, Dict
 from src.config import Config
 from src.generate import generate_answer_from_retrieval
 from streamlit_cropper import st_cropper
+from ui.sidebar import EMBEDDING_MODELS
 
 
-def initialize_components():
+def short_model_name(model_name_or_path: str) -> str:
+    name = model_name_or_path.lower()
+    name = re.sub(r"^.*[\\/]|openai/|google/|facebook/", "", name)
+    name = re.sub(r"[^a-z0-9]+", "_", name)
+    return name.strip("_")
+
+
+def initialize_components(cfg: Config):
     """Initialize embedding model and vector store"""
     if (
         st.session_state.embedder is None
@@ -16,13 +25,13 @@ def initialize_components():
     ):
         try:
             with st.spinner(f"Loading {st.session_state.selected_model}..."):
-                from ui.sidebar import EMBEDDING_MODELS
                 from src.embeddings.image_embedding import ImageEmbedding
                 from src.vector_stores.qdrant import QdrantVectorStore
 
                 model_path = EMBEDDING_MODELS[st.session_state.selected_model][
                     "model_path"
                 ]
+                cfg.MODEL_NAME_OR_PATH = model_path
                 st.session_state.embedder = ImageEmbedding(
                     model_name_or_path=model_path, device="cpu"
                 )
@@ -36,7 +45,7 @@ def initialize_components():
     return True
 
 
-def perform_search(query_image: Image.Image) -> List[Dict]:
+def perform_search(cfg: Config, query_image: Image.Image) -> List[Dict]:
     """Perform similarity search"""
     try:
         # Get embedding
@@ -47,12 +56,18 @@ def perform_search(query_image: Image.Image) -> List[Dict]:
             return []
 
         # Configure collection based on category
+        model_path = EMBEDDING_MODELS[st.session_state.selected_model]["model_path"]
+        model_part = short_model_name(model_path)
         if st.session_state.category == "disease":
-            image_dir = Path(Config.DATASET_DIR) / "disease" / "images"
-            collection_name = f"{st.session_state.collection_name_prefix}_disease"
+            image_dir = Path(cfg.DATASET_DIR) / "disease" / "images"
+            collection_name = (
+                f"{st.session_state.collection_name_prefix}_disease_{model_part}"
+            )
         else:
-            image_dir = Path(Config.DATASET_DIR) / "pest" / "images"
-            collection_name = f"{st.session_state.collection_name_prefix}_pest"
+            image_dir = Path(cfg.DATASET_DIR) / "pest" / "images"
+            collection_name = (
+                f"{st.session_state.collection_name_prefix}_pest_{model_part}"
+            )
 
         # Query vector store
         results = st.session_state.store.query(
@@ -134,7 +149,7 @@ def display_search_results(results: List[Dict]):
                     st.markdown(f"**{k}:** {v}")
 
 
-def create_search_page():
+def create_search_page(cfg: Config):
     """Page 3: Image Search with enhanced UI"""
     st.title("🔍 Durian Image Similarity Search")
     st.caption("🔍 Image Search")
@@ -145,7 +160,7 @@ def create_search_page():
     distance_metric = st.session_state.get("distance_metric", "cosine")
 
     # Initialize components
-    if not initialize_components():
+    if not initialize_components(cfg):
         st.error(
             "Failed to initialize the embedding model. Please check your configuration."
         )
@@ -199,7 +214,18 @@ def create_search_page():
             if st.button(
                 "🔍 Search Similar Images", use_container_width=True, type="primary"
             ):
-                st.session_state.search_results = perform_search(cropped_img)
+                # Ensure only the image is passed to perform_search, not a tuple or dict
+                if isinstance(cropped_img, Image.Image):
+                    st.session_state.search_results = perform_search(cfg, cropped_img)
+                elif isinstance(cropped_img, tuple) and isinstance(
+                    cropped_img[0], Image.Image
+                ):
+                    st.session_state.search_results = perform_search(
+                        cfg, cropped_img[0]
+                    )
+                else:
+                    st.error("Invalid image format for search.")
+                    st.session_state.search_results = None
                 st.session_state.llm_answer = None  # Reset any previous answer
                 st.rerun()
 

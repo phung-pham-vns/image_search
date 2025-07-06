@@ -14,6 +14,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+cfg = Config()
+
 # Initialize session state
 if "qdrant_uri" not in st.session_state:
     st.session_state.qdrant_uri = "http://localhost:6333/"
@@ -34,13 +36,13 @@ current_page = create_navigation()
 
 # Main content area
 if current_page == "Data Ingestion":
-    create_data_ingestion_page()
+    create_data_ingestion_page(cfg)
 elif current_page == "Disease Report":
     create_disease_report_page()
 elif current_page == "Pest Report":
     create_pest_report_page()
 elif current_page == "Image Search":
-    create_search_page()
+    create_search_page(cfg)
 elif current_page == "Ask with Image":
     create_ask_with_image_page()
 else:

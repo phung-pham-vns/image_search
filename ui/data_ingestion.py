@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -6,25 +7,36 @@ from src.ingest_data import DataIngester
 from ui.sidebar import EMBEDDING_MODELS
 
 
-def perform_data_ingestion(categories, batch_size, distance_metric):
+def short_model_name(model_name_or_path: str) -> str:
+    name = model_name_or_path.lower()
+    name = re.sub(r"^.*[\\/]|openai/|google/|facebook/", "", name)
+    name = re.sub(r"[^a-z0-9]+", "_", name)
+    return name.strip("_")
+
+
+def perform_data_ingestion(
+    cfg: Config,
+    categories: list[str],
+    batch_size: int,
+    distance_metric: str,
+):
     """Perform the actual data ingestion"""
     try:
         # Create a new config with updated values
-        updated_cfg = Config()
-        updated_cfg.QDRANT_URI = st.session_state.qdrant_uri
-        updated_cfg.COLLECTION_NAME_PREFIX = st.session_state.collection_name_prefix
-        updated_cfg.EMBEDDING_NAME = EMBEDDING_MODELS[st.session_state.selected_model][
+        cfg.QDRANT_URI = st.session_state.qdrant_uri
+        cfg.COLLECTION_NAME_PREFIX = st.session_state.collection_name_prefix
+        cfg.EMBEDDING_NAME = EMBEDDING_MODELS[st.session_state.selected_model][
             "model_path"
         ]
-        updated_cfg.MODEL_NAME_OR_PATH = EMBEDDING_MODELS[
-            st.session_state.selected_model
-        ]["model_path"]
-        updated_cfg.DEVICE = "cpu"  # Default device
-        updated_cfg.DATASET_DIR = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset"
-        updated_cfg.PROCESSED_DATASET_DIR = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset"
+        cfg.MODEL_NAME_OR_PATH = EMBEDDING_MODELS[st.session_state.selected_model][
+            "model_path"
+        ]
+        cfg.DEVICE = "cpu"  # Default device
+        cfg.DATASET_DIR = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset"
+        cfg.PROCESSED_DATASET_DIR = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset"
 
         # Initialize ingester with updated config
-        ingester = DataIngester(updated_cfg)
+        ingester = DataIngester(cfg)
 
         # Update ingestion status
         for category in categories:
@@ -33,14 +45,13 @@ def perform_data_ingestion(categories, batch_size, distance_metric):
                 "progress": 0,
             }
 
+        model_part = short_model_name(cfg.MODEL_NAME_OR_PATH)
         # Perform ingestion for each category
         for category in categories:
             try:
                 with st.spinner(f"Ingesting {category}..."):
                     # Create collection
-                    collection_name = (
-                        f"{st.session_state.collection_name_prefix}_{category}"
-                    )
+                    collection_name = f"{st.session_state.collection_name_prefix}_{category}_{model_part}"
                     embedding_size = EMBEDDING_MODELS[st.session_state.selected_model][
                         "embedding_size"
                     ]
@@ -84,7 +95,7 @@ def perform_data_ingestion(categories, batch_size, distance_metric):
         st.error(f"Data ingestion failed: {e}")
 
 
-def create_data_ingestion_page():
+def create_data_ingestion_page(cfg: Config):
     """Page for data ingestion with comprehensive settings and monitoring"""
     st.title("📥 Data Ingestion")
     st.caption("Ingest image data into the vector database for similarity search")
@@ -138,7 +149,7 @@ def create_data_ingestion_page():
                 return
 
             # Start ingestion
-            perform_data_ingestion(categories, batch_size, distance_metric)
+            perform_data_ingestion(cfg, categories, batch_size, distance_metric)
 
     with col2:
         st.subheader("📊 Current Status")
@@ -171,6 +182,9 @@ def create_data_ingestion_page():
 
     # Results section
     if st.session_state.ingestion_status:
+        model_part = short_model_name(
+            EMBEDDING_MODELS[st.session_state.selected_model]["model_path"]
+        )
         st.subheader("📋 Ingestion Results")
 
         # Create results table
@@ -182,7 +196,7 @@ def create_data_ingestion_page():
                         "Category": category,
                         "Images Processed": status.get("processed", 0),
                         "Vectors Stored": status.get("vectors", 0),
-                        "Collection Name": f"{st.session_state.collection_name_prefix}_{category}",
+                        "Collection Name": f"{st.session_state.collection_name_prefix}_{category}_{model_part}",
                         "Status": "✅ Completed",
                     }
                 )

@@ -121,9 +121,9 @@ def create_disease_report_page():
                     reverse=True,
                 )[:5]
 
-                st.subheader("🏆 Top 5 Categories")
-                for i, (category, count) in enumerate(top_categories, 1):
-                    st.metric(f"{i}. {category}", f"{count} images")
+                # st.subheader("🏆 Top 5 Categories")
+                # for i, (category, count) in enumerate(top_categories, 1):
+                #     st.metric(f"{i}. {category}", f"{count} images")
 
 
 def create_pest_report_page():
@@ -216,6 +216,6 @@ def create_pest_report_page():
                     reverse=True,
                 )[:5]
 
-                st.subheader("🏆 Top 5 Categories")
-                for i, (category, count) in enumerate(top_categories, 1):
-                    st.metric(f"{i}. {category}", f"{count} images")
+                # st.subheader("🏆 Top 5 Categories")
+                # for i, (category, count) in enumerate(top_categories, 1):
+                #     st.metric(f"{i}. {category}", f"{count} images")
