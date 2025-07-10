@@ -5,7 +5,7 @@ from PIL import Image
 
 # Root dataset folder
 root_dir = Path(
-    "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/updated_dataset/disease"
+    "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/updated_dataset/pest"
 )
 
 # Allowed image file extensions

@@ -3,7 +3,7 @@ from PIL import Image
 
 from src.core.config import Config
 from src.core.search import ImageSearcher
-from processing.generate import generate_answer_from_retrieval
+from src.core.generate import generate_answer_from_retrieval
 
 
 def initialize_searcher(cfg: Config) -> ImageSearcher:

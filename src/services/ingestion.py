@@ -90,10 +90,7 @@ class DataIngester:
         except Exception as e:
             raise DataIngestionError(f"Failed to initialize components: {e}")
 
-    def load_image_paths(
-        self,
-        image_dir: Path,
-    ) -> List[Path]:
+    def load_image_paths(self, image_dir: Path) -> List[Path]:
         """
         Recursively load image file paths with given extensions.
         """
@@ -127,7 +124,9 @@ class DataIngester:
             raise DataIngestionError(f"Error reading label file {label_path}: {e}")
 
     def _process_single_image(
-        self, image_path: Path, label_dir: Path
+        self,
+        image_path: Path,
+        label_dir: Path,
     ) -> Optional[ImageData]:
         """
         Process a single image and its metadata.

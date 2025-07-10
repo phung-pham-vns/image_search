@@ -1,7 +1,6 @@
 import re
-import streamlit as st
 import pandas as pd
-from pathlib import Path
+import streamlit as st
 from src.core.config import Config
 from src.services.ingestion import DataIngester
 from ui.sidebar import EMBEDDING_MODELS
@@ -26,33 +25,6 @@ def run_ingestion(cfg: Config, categories: list[str]):
         cat: {"status": "in_progress", "details": ""} for cat in categories
     }
     st.rerun()  # Rerun to show the initial "in_progress" status
-
-    try:
-        ingester = DataIngester(config=cfg)
-
-        for category in categories:
-            with st.spinner(f"Ingesting data for '{category}'..."):
-                try:
-                    ingester.ingest_category(category)
-                    st.session_state.ingestion_status[category] = {
-                        "status": "completed",
-                        "details": f"Successfully ingested all items for '{category}'.",
-                    }
-                except Exception as e:
-                    st.session_state.ingestion_status[category] = {
-                        "status": "failed",
-                        "details": f"Failed to ingest '{category}': {e}",
-                    }
-            st.rerun()  # Rerun to update the status of the completed category
-
-    except Exception as e:
-        st.error(f"A critical error occurred during initialization: {e}")
-        for cat in categories:
-            if st.session_state.ingestion_status[cat]["status"] == "in_progress":
-                st.session_state.ingestion_status[cat] = {
-                    "status": "failed",
-                    "details": "Initialization failed.",
-                }
 
 
 def create_data_ingestion_page(cfg: Config):

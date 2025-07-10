@@ -179,7 +179,7 @@ def create_navigation():
         "Image Search",
         "Ask with Image",
         "Data Ingestion",
-        "Reports",
+        "Data Investigation",
     ]
     current_page = st.sidebar.selectbox(
         "Select Page",

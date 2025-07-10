@@ -1,4 +1,5 @@
 import torch
+import httpx
 import numpy as np
 import torch.nn.functional as F
 
@@ -94,33 +95,33 @@ class DINOv2Embedder(BaseImageEmbedder):
         return image_features.cpu().numpy().flatten()
 
 
-# TULIP
-class TULIPEmbedder(BaseImageEmbedder):
-    def __init__(
-        self,
-        model_name_or_path: str = "TULIP-so400m-14-384",
-        device: Union[str, torch.device] = "cpu",
-    ):
-        super().__init__(model_name_or_path, device)
-        try:
-            import open_clip
-        except ImportError:
-            raise ImportError("Please install open_clip package to use TULIP models.")
+class TULIPEmbedder:
+    """
+    Central registry of embedding-capable models.
+    """
 
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-            model_name_or_path, pretrained=True
+    def __init__(self, image_embedder_url, image_embedder_token):
+        self.base_url = image_embedder_url
+        self.api_key = image_embedder_token
+        self.endpoint = "image_embeddings"
+
+    async def embedding(self, image: str):
+        """Embed a list of texts using a specified model."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {"model": "string", "input": [image]}
+
+        response = await httpx.AsyncClient().post(
+            f"{self.base_url}{self.endpoint}", headers=headers, json=payload, timeout=30
         )
-        self.model.to(self.device).eval()
 
-    def embed(self, image: str | Image.Image) -> np.ndarray:
-        image = self.preprocess_image(image)
-        if image is None:
-            raise ValueError("Invalid image input for embedding.")
-        image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            image_features = self.model.encode_image(image_tensor)
-            image_features = F.normalize(image_features, p=2, dim=1)
-        return image_features.cpu().numpy().flatten()
+        response_json = response.json()
+
+        embedding = response_json["data"][0]["embedding"]
+
+        return embedding
 
 
 # Main selector class

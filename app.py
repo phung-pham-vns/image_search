@@ -1,12 +1,12 @@
-import streamlit as st
 import torch
+import streamlit as st
 
 from src.core.config import Config
-from ui.sidebar import create_sidebar_settings, create_navigation, EMBEDDING_MODELS
-from ui.data_ingestion import create_data_ingestion_page
-from ui.reports import create_reports_page
 from ui.search import create_search_page
+from ui.data_investigation import create_reports_page
+from ui.data_ingestion import create_data_ingestion_page
 from ui.ask_with_image import create_ask_with_image_page
+from ui.sidebar import create_sidebar_settings, create_navigation, EMBEDDING_MODELS
 
 
 def initialize_session_state():
@@ -27,7 +27,7 @@ def initialize_session_state():
         st.session_state.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     if "top_k" not in st.session_state:
-        st.session_state.top_k = 5
+        st.session_state.top_k = 3
 
     if "display_metadata" not in st.session_state:
         st.session_state.display_metadata = True
@@ -73,7 +73,7 @@ def main():
         create_ask_with_image_page(cfg)
     elif st.session_state.current_page == "Data Ingestion":
         create_data_ingestion_page(cfg)
-    elif st.session_state.current_page == "Reports":
+    elif st.session_state.current_page == "Data Investigation":
         create_reports_page(cfg)
     else:
         st.error(f"Unknown page: {st.session_state.current_page}")
