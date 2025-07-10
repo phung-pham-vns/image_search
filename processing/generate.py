@@ -37,8 +37,8 @@ def generate_answer_from_retrieval(
     )
 
     if openai and (openai_api_key or os.getenv("OPENAI_API_KEY")):
-        openai.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
-        response = openai.ChatCompletion.create(
+        client = openai.OpenAI(api_key=openai_api_key or os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
@@ -47,8 +47,7 @@ def generate_answer_from_retrieval(
             max_tokens=256,
             temperature=0.2,
         )
-        return response["choices"][0]["message"]["content"].strip()
+        return response.choices[0].message.content.strip()
     else:
         # Placeholder: just echo the context and question
         return f"[LLM not available] Question: {question}\nContext:\n{context}"
-

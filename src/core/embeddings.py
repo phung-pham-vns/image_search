@@ -10,7 +10,9 @@ from transformers import AutoProcessor, AutoModel
 # Base class for all embedders
 class BaseImageEmbedder:
     def __init__(
-        self, model_name_or_path: str, device: Union[str, torch.device] = "cpu"
+        self,
+        model_name_or_path: str,
+        device: Union[str, torch.device] = "cpu",
     ):
         self.model_name_or_path = model_name_or_path
         self.device = torch.device(device)
@@ -38,7 +40,9 @@ class BaseImageEmbedder:
 # CLIP implementation
 class CLIPEmbedder(BaseImageEmbedder):
     def __init__(
-        self, model_name_or_path: str, device: Union[str, torch.device] = "cpu"
+        self,
+        model_name_or_path: str,
+        device: Union[str, torch.device] = "cpu",
     ):
         super().__init__(model_name_or_path, device)
         try:
@@ -90,6 +94,35 @@ class DINOv2Embedder(BaseImageEmbedder):
         return image_features.cpu().numpy().flatten()
 
 
+# TULIP
+class TULIPEmbedder(BaseImageEmbedder):
+    def __init__(
+        self,
+        model_name_or_path: str = "TULIP-so400m-14-384",
+        device: Union[str, torch.device] = "cpu",
+    ):
+        super().__init__(model_name_or_path, device)
+        try:
+            import open_clip
+        except ImportError:
+            raise ImportError("Please install open_clip package to use TULIP models.")
+
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(
+            model_name_or_path, pretrained=True
+        )
+        self.model.to(self.device).eval()
+
+    def embed(self, image: str | Image.Image) -> np.ndarray:
+        image = self.preprocess_image(image)
+        if image is None:
+            raise ValueError("Invalid image input for embedding.")
+        image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            image_features = self.model.encode_image(image_tensor)
+            image_features = F.normalize(image_features, p=2, dim=1)
+        return image_features.cpu().numpy().flatten()
+
+
 # Main selector class
 class ImageEmbedding:
     def __init__(
@@ -105,6 +138,8 @@ class ImageEmbedding:
             self.backend = SigLIPEmbedder(model_name_or_path, device)
         elif "dino" in model_name:
             self.backend = DINOv2Embedder(model_name_or_path, device)
+        elif "tulip" in model_name:
+            self.backend = TULIPEmbedder(model_name_or_path, device)
         else:
             # Default to CLIP-like interface for unknown models
             self.backend = CLIPEmbedder(model_name_or_path, device)
@@ -114,3 +149,11 @@ class ImageEmbedding:
 
     def embed(self, image: str | Image.Image) -> np.ndarray:
         return self.backend.embed(image)
+
+
+if __name__ == "__main__":
+    embedder = ImageEmbedding(model_name_or_path="google/siglip2-base-patch16-224")
+    img = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset/disease/images/0af2a5be-1ef6-420c-b86a-4f46c19b244a.jpeg"  # Replace with your image path
+    embedding = embedder.embed(img)
+    print("Image embedding shape:", embedding.shape)
+    print("Embedding:", embedding)

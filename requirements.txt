@@ -3,7 +3,8 @@ Pillow
 streamlit
 streamlit_cropper
 qdrant_client
-transformers
+transformers>=4.32.1
 pandas
 plotly
 tqdm
+open_clip

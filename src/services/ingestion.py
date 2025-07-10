@@ -7,9 +7,9 @@ from tqdm import tqdm
 import numpy as np
 import re
 
-from .config import Config
-from .embeddings.image_embedding import ImageEmbedding
-from .vector_stores.qdrant import QdrantVectorStore
+from ..core.config import Config
+from ..core.embeddings import ImageEmbedding
+from ..core.vector_store import QdrantVectorStore
 
 
 @dataclass
@@ -43,17 +43,18 @@ class DataIngester:
         self.logger = self._setup_logging()
         self.embedder = None
         self.store = None
-        # Validate configuration
         self._validate_config()
-        # Initialize components
         self._initialize_components()
 
     def _setup_logging(self) -> logging.Logger:
         """Set up logging configuration."""
         logging.basicConfig(
-            level=logging.INFO,
+            level=self.config.LOG_LEVEL,
             format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[logging.StreamHandler(), logging.FileHandler("ingestion.log")],
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(self.config.LOG_FILE),
+            ],
         )
         return logging.getLogger(__name__)
 
@@ -70,7 +71,6 @@ class DataIngester:
 
     def _short_model_name(self, model_name_or_path: str) -> str:
         """Sanitize and shorten model name for use in collection name."""
-        # Remove common path/prefixes and non-alphanumeric
         name = model_name_or_path.lower()
         name = re.sub(r"^.*[\\/]|openai/|google/|facebook/", "", name)
         name = re.sub(r"[^a-z0-9]+", "_", name)
@@ -93,27 +93,16 @@ class DataIngester:
     def load_image_paths(
         self,
         image_dir: Path,
-        extensions: Tuple[str, ...] = ("*.jpg", "*.jpeg", "*.png"),
     ) -> List[Path]:
         """
         Recursively load image file paths with given extensions.
-
-        Args:
-            image_dir: Directory containing images
-            extensions: Tuple of file extensions to include
-
-        Returns:
-            List of image file paths
-
-        Raises:
-            DataIngestionError: If image directory doesn't exist or is empty
         """
         if not image_dir.exists():
             raise DataIngestionError(f"Image directory does not exist: {image_dir}")
 
         image_paths = []
-        for ext in extensions:
-            image_paths.extend(image_dir.rglob(ext))
+        for ext in self.config.VALID_IMAGE_EXTENSIONS:
+            image_paths.extend(image_dir.rglob(f"*{ext}"))
 
         if not image_paths:
             raise DataIngestionError(f"No image files found in {image_dir}")
@@ -124,16 +113,6 @@ class DataIngester:
     def _load_metadata(self, label_path: Path, image_name: str) -> Dict[str, Any]:
         """
         Load metadata from label file.
-
-        Args:
-            label_path: Path to the label JSON file
-            image_name: Name of the image file
-
-        Returns:
-            Dictionary containing metadata with image_name added
-
-        Raises:
-            DataIngestionError: If label file is invalid or missing
         """
         try:
             with label_path.open("r", encoding="utf-8") as f:
@@ -152,24 +131,12 @@ class DataIngester:
     ) -> Optional[ImageData]:
         """
         Process a single image and its metadata.
-
-        Args:
-            image_path: Path to the image file
-            label_dir: Directory containing label files
-
-        Returns:
-            ImageData object if processing successful, None otherwise
         """
         try:
             label_path = label_dir / f"{image_path.stem}.json"
-
-            # Load metadata
             metadata = self._load_metadata(label_path, image_path.name)
+            vector = self._get_embedding(image_path)
 
-            # Generate embedding
-            if self.embedder is None:
-                raise DataIngestionError("Embedder not initialized")
-            vector = self.embedder.embed(str(image_path))
             if vector is None:
                 self.logger.warning(
                     f"Failed to generate embedding for {image_path.name}"
@@ -183,29 +150,26 @@ class DataIngester:
                 metadata=metadata,
                 image_id=image_path.stem,
             )
-
         except DataIngestionError:
-            # Re-raise our custom exceptions
             raise
         except Exception as e:
             self.logger.error(f"Unexpected error processing {image_path.name}: {e}")
             return None
 
+    def _get_embedding(self, image_path: Path) -> Optional[np.ndarray]:
+        """Generate embedding for a single image."""
+        if self.embedder is None:
+            raise DataIngestionError("Embedder not initialized")
+        return self.embedder.embed(str(image_path))
+
     def _process_images_batch(
-        self, image_paths: List[Path], label_dir: Path, batch_size: int = 32
+        self, image_paths: List[Path], label_dir: Path
     ) -> List[ImageData]:
         """
         Process images in batches for better performance and memory management.
-
-        Args:
-            image_paths: List of image paths to process
-            label_dir: Directory containing label files
-            batch_size: Number of images to process in each batch
-
-        Returns:
-            List of successfully processed ImageData objects
         """
         processed_data = []
+        batch_size = self.config.BATCH_SIZE
 
         for i in tqdm(range(0, len(image_paths), batch_size), desc="Processing images"):
             batch_paths = image_paths[i : i + batch_size]
@@ -222,10 +186,6 @@ class DataIngester:
 
             processed_data.extend(batch_data)
 
-            # Log progress
-            if (i + batch_size) % (batch_size * 5) == 0:
-                self.logger.info(f"Processed {len(processed_data)} images so far")
-
         return processed_data
 
     def _prepare_upload_data(
@@ -233,12 +193,6 @@ class DataIngester:
     ) -> Tuple[List[List[float]], List[Dict[str, Any]], List[str]]:
         """
         Prepare data for upload to vector store.
-
-        Args:
-            processed_data: List of processed ImageData objects
-
-        Returns:
-            Tuple of (vectors, payloads, ids) for upload
         """
         vectors = [data.vector for data in processed_data if data.vector is not None]
         payloads = [data.metadata for data in processed_data if data.vector is not None]
@@ -254,9 +208,6 @@ class DataIngester:
     def _create_collection(self, category: str) -> None:
         """
         Create vector store collection for the given category.
-
-        Args:
-            category: Category name for the collection
         """
         collection_name = self._collection_name(category)
 
@@ -266,7 +217,7 @@ class DataIngester:
             self.store.create_collection(
                 collection_name=collection_name,
                 embedding_size=self.config.EMEBDDING_DIM,
-                distance="cosine",
+                distance=self.config.DISTANCE_METRIC,
             )
             self.logger.info(f"Created collection: {collection_name}")
         except Exception as e:
@@ -283,21 +234,13 @@ class DataIngester:
     ) -> None:
         """
         Upload embeddings to vector store.
-
-        Args:
-            category: Category name for the collection
-            vectors: List of embedding vectors
-            payloads: List of metadata payloads
-            ids: List of image IDs
         """
         collection_name = self._collection_name(category)
 
         try:
             if self.store is None:
                 raise DataIngestionError("Vector store not initialized")
-            # Convert vectors to numpy arrays
             numpy_vectors = [np.array(vector) for vector in vectors]
-            # Cast ids to the expected type
             typed_ids = cast(List[Union[str, int]], ids)
             self.store.add_embeddings(
                 collection_name=collection_name,
@@ -313,34 +256,23 @@ class DataIngester:
                 f"Failed to upload embeddings to {collection_name}: {e}"
             )
 
-    def ingest_category(self, category: str, batch_size: int = 32) -> None:
+    def ingest_category(self, category: str) -> None:
         """
         Ingest all images for a specific category.
-
-        Args:
-            category: Category name (e.g., 'disease', 'pest')
-            batch_size: Number of images to process in each batch
         """
         self.logger.info(f"Starting ingestion for category: {category}")
 
-        # Set up paths
-        image_dir = Path(f"{self.config.PROCESSED_DATASET_DIR}/{category}/images")
-        label_dir = Path(f"{self.config.PROCESSED_DATASET_DIR}/{category}/labels")
+        image_dir = self.config.PROCESSED_DATASET_DIR / category / "images"
+        label_dir = self.config.PROCESSED_DATASET_DIR / category / "labels"
 
-        # Load image paths
         image_paths = self.load_image_paths(image_dir)
-
-        # Create collection
         self._create_collection(category)
-
-        # Process images
-        processed_data = self._process_images_batch(image_paths, label_dir, batch_size)
+        processed_data = self._process_images_batch(image_paths, label_dir)
 
         if not processed_data:
             self.logger.warning(f"No valid images processed for category {category}")
             return
 
-        # Prepare and upload data
         vectors, payloads, ids = self._prepare_upload_data(processed_data)
         self._upload_embeddings(category, vectors, payloads, ids)
 
@@ -348,39 +280,27 @@ class DataIngester:
             f"Successfully ingested {len(processed_data)} images for category {category}"
         )
 
-    def run(self, categories: List[str], batch_size: int = 32) -> None:
+    def run(self, categories: List[str]) -> None:
         """
         Run the complete ingestion process for multiple categories.
-
-        Args:
-            categories: List of category names to process
-            batch_size: Number of images to process in each batch
         """
         self.logger.info("Starting data ingestion process")
-
         try:
-            # Process each category
             for category in categories:
                 try:
-                    self.ingest_category(category, batch_size)
+                    self.ingest_category(category)
                 except DataIngestionError as e:
                     self.logger.error(f"Failed to ingest category {category}: {e}")
                     continue
-
             self.logger.info("Data ingestion process completed")
-
         except Exception as e:
             self.logger.error(f"Fatal error during ingestion: {e}")
             raise
 
 
-def main(categories: Optional[List[str]] = None, batch_size: int = 32) -> None:
+def main(categories: Optional[List[str]] = None) -> None:
     """
     Main function to run the data ingestion process.
-
-    Args:
-        categories: List of categories to process. If None, defaults to ['disease', 'pest']
-        batch_size: Number of images to process in each batch
     """
     if categories is None:
         categories = ["disease", "pest"]
@@ -389,7 +309,7 @@ def main(categories: Optional[List[str]] = None, batch_size: int = 32) -> None:
     ingester = DataIngester(config)
 
     try:
-        ingester.run(categories, batch_size)
+        ingester.run(categories)
     except Exception as e:
         logging.error(f"Failed to complete ingestion: {e}")
         raise

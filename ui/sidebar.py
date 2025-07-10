@@ -1,5 +1,5 @@
 import streamlit as st
-from src.config import Config
+from src.core.config import Config
 
 # Available embedding models with detailed specifications
 EMBEDDING_MODELS = {
@@ -10,8 +10,6 @@ EMBEDDING_MODELS = {
         "model_size": "~1.2GB",
         "purpose": "General-purpose image embedding with strong zero-shot capabilities",
         "architecture": "Vision Transformer (ViT-B/16)",
-        "training_data": "400M image-text pairs",
-        "performance": "Excellent for image similarity and retrieval tasks",
     },
     "SigLIP2 Large": {
         "model_path": "google/siglip2-large-patch16-224",
@@ -20,8 +18,6 @@ EMBEDDING_MODELS = {
         "model_size": "~2.5GB",
         "purpose": "High-performance image embedding with superior accuracy",
         "architecture": "Vision Transformer (ViT-L/16)",
-        "training_data": "400M image-text pairs",
-        "performance": "Best performance for complex image analysis tasks",
     },
     "CLIP ViT-B/32": {
         "model_path": "openai/clip-vit-base-patch32",
@@ -30,8 +26,6 @@ EMBEDDING_MODELS = {
         "model_size": "~150MB",
         "purpose": "Efficient image-text understanding and similarity",
         "architecture": "Vision Transformer (ViT-B/32)",
-        "training_data": "400M image-text pairs",
-        "performance": "Good balance of speed and accuracy",
     },
     "CLIP ViT-L/14": {
         "model_path": "openai/clip-vit-large-patch14",
@@ -40,8 +34,6 @@ EMBEDDING_MODELS = {
         "model_size": "~1.7GB",
         "purpose": "High-quality image understanding and retrieval",
         "architecture": "Vision Transformer (ViT-L/14)",
-        "training_data": "400M image-text pairs",
-        "performance": "Excellent accuracy for image similarity tasks",
     },
     "DINOv2 ViT-B/14": {
         "model_path": "facebook/dinov2-base",
@@ -50,8 +42,6 @@ EMBEDDING_MODELS = {
         "model_size": "~1.1GB",
         "purpose": "Self-supervised image representation learning",
         "architecture": "Vision Transformer (ViT-B/14)",
-        "training_data": "142M images",
-        "performance": "Strong performance on visual tasks without labels",
     },
     "DINOv2 ViT-L/14": {
         "model_path": "facebook/dinov2-large",
@@ -60,8 +50,14 @@ EMBEDDING_MODELS = {
         "model_size": "~2.4GB",
         "purpose": "High-capacity self-supervised image understanding",
         "architecture": "Vision Transformer (ViT-L/14)",
-        "training_data": "142M images",
-        "performance": "Best performance for self-supervised visual tasks",
+    },
+    "TULIP": {
+        "model_path": "TULIP-so400m-14-384",
+        "description": "TULIP model for specialized embeddings",
+        "embedding_size": 512,
+        "model_size": "N/A",
+        "purpose": "Specialized peptide-protein interaction embeddings",
+        "architecture": "Transformer-based",
     },
 }
 
@@ -69,7 +65,7 @@ EMBEDDING_MODELS = {
 def check_database_status():
     """Check and display database status"""
     try:
-        from src.vector_stores.qdrant import QdrantVectorStore
+        from src.core.vector_store import QdrantVectorStore
 
         store = QdrantVectorStore(uri=st.session_state.qdrant_uri)
         collections = store.client.get_collections()
@@ -102,48 +98,46 @@ def create_sidebar_settings():
     collection_prefix = st.sidebar.text_input(
         "Collection Name Prefix",
         value=st.session_state.collection_name_prefix,
-        help="Prefix for collection names (e.g., 'durian' creates 'durian_disease', 'durian_pest')",
+        help="Prefix for collection names (e.g., 'image_retrieval')",
     )
     st.session_state.collection_name_prefix = collection_prefix
 
     # Embedding Model Selection
     st.sidebar.subheader("🤖 Embedding Model")
-    selected_model = st.sidebar.selectbox(
+    selected_model_name = st.sidebar.selectbox(
         "Choose Model",
         options=list(EMBEDDING_MODELS.keys()),
         index=list(EMBEDDING_MODELS.keys()).index(st.session_state.selected_model),
         help="Select the embedding model for image processing",
     )
 
-    if selected_model != st.session_state.selected_model:
-        st.session_state.selected_model = selected_model
-        st.session_state.embedder = None  # Reset embedder to reload model
+    if selected_model_name != st.session_state.selected_model:
+        st.session_state.selected_model = selected_model_name
+        # Trigger a rerun to reload the model in the main app logic
+        st.rerun()
 
     # Model Specifications
-    if selected_model in EMBEDDING_MODELS:
-        model_specs = EMBEDDING_MODELS[selected_model]
+    if selected_model_name in EMBEDDING_MODELS:
+        model_specs = EMBEDDING_MODELS[selected_model_name]
 
         with st.sidebar.expander("📋 Model Specifications", expanded=False):
-            st.markdown(f"**Description:** {model_specs['description']}")
-            st.markdown(f"**Purpose:** {model_specs['purpose']}")
-            st.markdown(f"**Architecture:** {model_specs['architecture']}")
+            st.markdown(f"**Description:** {model_specs.get('description', 'N/A')}")
+            st.markdown(f"**Purpose:** {model_specs.get('purpose', 'N/A')}")
+            st.markdown(f"**Architecture:** {model_specs.get('architecture', 'N/A')}")
             st.markdown(
-                f"**Embedding Size:** {model_specs['embedding_size']} dimensions"
+                f"**Embedding Size:** {model_specs.get('embedding_size', 'N/A')} dimensions"
             )
-            st.markdown(f"**Model Size:** {model_specs['model_size']}")
-            st.markdown(f"**Training Data:** {model_specs['training_data']}")
-            st.markdown(f"**Performance:** {model_specs['performance']}")
+            st.markdown(f"**Model Size:** {model_specs.get('model_size', 'N/A')}")
 
     # Device Configuration
     st.sidebar.subheader("💻 Hardware")
     device = st.sidebar.selectbox(
         "Device",
         options=["cpu", "cuda", "mps"],
-        index=0,
+        index=["cpu", "cuda", "mps"].index(st.session_state.device),
         help="Device to run the embedding model on",
     )
-    cfg = Config()
-    cfg.DEVICE = device
+    st.session_state.device = device
 
     # Search Configuration
     st.sidebar.subheader("🔍 Search Settings")
@@ -151,15 +145,15 @@ def create_sidebar_settings():
         "Top K Results",
         min_value=1,
         max_value=20,
-        value=st.session_state.get("top_k", 5),
+        value=st.session_state.top_k,
         help="Number of similar images to return",
     )
     st.session_state.top_k = top_k
 
     show_metadata = st.sidebar.toggle(
         "Show Metadata",
-        value=st.session_state.get("display_metadata", True),
-        help="Display disease/pest labels and similarity scores",
+        value=st.session_state.display_metadata,
+        help="Display labels and similarity scores",
     )
     st.session_state.display_metadata = show_metadata
 
@@ -171,9 +165,9 @@ def create_sidebar_settings():
     if "db_status" in st.session_state:
         for collection, info in st.session_state.db_status.items():
             with st.sidebar.expander(f"📁 {collection}", expanded=False):
-                st.markdown(f"**Points:** {info['points']}")
-                st.markdown(f"**Vectors:** {info['vectors']}")
-                st.markdown(f"**Status:** {info['status']}")
+                st.markdown(f"**Points:** {info.get('points', 'N/A')}")
+                st.markdown(f"**Vectors:** {info.get('vectors', 'N/A')}")
+                st.markdown(f"**Status:** {info.get('status', 'N/A')}")
 
 
 def create_navigation():
@@ -182,11 +176,10 @@ def create_navigation():
     st.sidebar.subheader("🧭 Navigation")
 
     page_options = [
-        "Data Ingestion",
-        "Disease Report",
-        "Pest Report",
         "Image Search",
         "Ask with Image",
+        "Data Ingestion",
+        "Reports",
     ]
     current_page = st.sidebar.selectbox(
         "Select Page",
@@ -197,38 +190,3 @@ def create_navigation():
     if current_page != st.session_state.current_page:
         st.session_state.current_page = current_page
         st.rerun()
-
-    # Add search parameters to sidebar for Image Search page
-    if st.session_state.current_page == "Image Search":
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🔍 Search Parameters")
-        # Category
-        search_category = st.sidebar.radio(
-            "Search Category",
-            options=["disease", "pest"],
-            index=0 if st.session_state.get("category", "disease") == "disease" else 1,
-            help="Choose whether to search for disease or pest",
-            key="sidebar_search_category",
-        )
-        st.session_state.category = search_category
-        # Top K
-        top_k = st.sidebar.slider(
-            "Top K Results",
-            min_value=1,
-            max_value=20,
-            value=st.session_state.get("top_k", 5),
-            help="Number of similar images to return",
-            key="sidebar_top_k",
-        )
-        st.session_state.top_k = top_k
-        # Distance metric
-        distance_metric = st.sidebar.selectbox(
-            "Distance Metric",
-            options=["cosine", "euclid", "dot", "manhattan"],
-            index=0,
-            help="Distance metric for vector similarity",
-            key="sidebar_distance_metric",
-        )
-        st.session_state.distance_metric = distance_metric
-
-    return current_page

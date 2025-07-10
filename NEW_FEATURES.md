@@ -257,4 +257,78 @@ The new features significantly enhance the Durian Image Retrieval System by prov
 4. **Enhanced User Experience**: Intuitive and responsive interface
 5. **Professional Features**: Production-ready capabilities
 
-These improvements transform the system from a simple search tool into a comprehensive image retrieval and management platform suitable for both research and production use. 
+These improvements transform the system from a simple search tool into a comprehensive image retrieval and management platform suitable for both research and production use.
+
+# New Features and Improvements
+
+## 1. TULIP Model Integration
+
+Added support for the TULIP (Transformer-based Unsupervised Language model for Interacting Peptides) model:
+
+- Implemented `TULIPEmbedder` class using the `open_clip` interface
+- Added model selection logic in `ImageEmbedding`
+- Updated requirements to include `open_clip` package
+- Default model: `TULIP-so400m-14-384`
+
+### Usage Example
+```python
+from src.embeddings.image_embedding import ImageEmbedding
+
+# Initialize with TULIP model
+embedder = ImageEmbedding(model_name_or_path="TULIP-so400m-14-384")
+
+# Get image embedding
+image_path = "path/to/image.jpg"
+embedding = embedder.embed(image_path)
+```
+
+## 2. System Improvements
+
+### Embedding Pipeline
+- Standardized embedding interface across all models
+- Improved error handling and logging
+- Added batch processing capabilities
+- Normalized embeddings for consistent similarity scores
+
+### Vector Store Integration
+- Enhanced Qdrant integration with better error handling
+- Added support for multiple distance metrics
+- Improved collection naming and management
+- Added payload validation
+
+### Data Processing
+- Optimized batch processing for large datasets
+- Added support for multiple image formats
+- Improved metadata handling
+- Added UUID-based file naming for uniqueness
+
+## 3. Configuration Updates
+
+Added new configuration options in `config.py`:
+```python
+# Model-specific settings
+TULIP_MODEL_NAME = "TULIP-so400m-14-384"
+EMBEDDING_BATCH_SIZE = 32
+NORMALIZE_EMBEDDINGS = True
+
+# Vector store settings
+DISTANCE_METRIC = "cosine"  # or "dot", "euclidean"
+COLLECTION_PREFIX = "image_retrieval"
+```
+
+## 4. Testing and Validation
+
+Added new test cases:
+- Model loading and initialization
+- Embedding generation and normalization
+- Vector store operations
+- End-to-end retrieval workflow
+
+## 5. Future Improvements
+
+Planned enhancements:
+1. Multi-GPU support for batch processing
+2. Model quantization for faster inference
+3. Async processing for large datasets
+4. Enhanced metadata filtering
+5. Web interface for visual search 
