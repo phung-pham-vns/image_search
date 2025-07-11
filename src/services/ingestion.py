@@ -1,15 +1,17 @@
+import re
 import json
 import logging
+import numpy as np
+
+from tqdm import tqdm
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any, Union, cast
 from dataclasses import dataclass
-from tqdm import tqdm
-import numpy as np
-import re
 
-from ..core.config import Config
-from ..core.embeddings import ImageEmbedding
-from ..core.vector_store import QdrantVectorStore
+from src.config import Config
+from src.constants import EMBEDDING_MODELS
+from src.core.embeddings import ImageEmbedding
+from src.core.vector_store import QdrantVectorStore
 
 
 @dataclass
@@ -297,14 +299,24 @@ class DataIngester:
             raise
 
 
-def main(categories: Optional[List[str]] = None) -> None:
-    """
-    Main function to run the data ingestion process.
-    """
+def main(
+    categories: Optional[List[str]] = None,
+    embedding_name: str = "SigLIP2 Base",
+    collection_name_prefix: str = "durian",
+) -> None:
+    """Main function to run the data ingestion process."""
     if categories is None:
         categories = ["disease", "pest"]
 
+    embedding_model = EMBEDDING_MODELS[embedding_name]
+    embedding_model_path = embedding_model["model_path"]
+    embedding_size = embedding_model["embedding_size"]
+
     config = Config()
+    config.MODEL_NAME_OR_PATH = embedding_model_path
+    config.EMEBDDING_DIM = embedding_size
+    config.COLLECTION_NAME_PREFIX = collection_name_prefix
+
     ingester = DataIngester(config)
 
     try:
@@ -315,4 +327,15 @@ def main(categories: Optional[List[str]] = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    embedding_names = [
+        # "SigLIP2 Base",
+        "SigLIP2 Large",
+        # "CLIP ViT-B/32",
+        # "DINOv2 ViT-B/14",
+        # "DINOv2 ViT-L/14",
+    ]
+    for embedding_name in embedding_names:
+        main(
+            embedding_name=embedding_name,
+            collection_name_prefix="durian_v2",
+        )

@@ -4,11 +4,10 @@ from pathlib import Path
 
 class Config:
     # Paths
-    PROCESSED_DATASET_DIR = Path("dataset/images/processed_dataset")
+    PROCESSED_DATASET_DIR = Path("dataset/images/250610_dataset/train_processed")
 
     # Model settings
     MODEL_NAME_OR_PATH = "google/siglip2-base-patch16-224"  # Default model
-    TULIP_MODEL_NAME = "TULIP-so400m-14-384"  # TULIP model option
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     EMEBDDING_DIM = 512  # Default embedding dimension
     EMBEDDING_BATCH_SIZE = 32

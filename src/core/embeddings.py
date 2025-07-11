@@ -1,3 +1,4 @@
+import os
 import torch
 import httpx
 import numpy as np
@@ -6,9 +7,12 @@ import torch.nn.functional as F
 from PIL import Image
 from typing import Union, Optional
 from transformers import AutoProcessor, AutoModel
+from dotenv import load_dotenv
+
+load_dotenv()
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 
-# Base class for all embedders
 class BaseImageEmbedder:
     def __init__(
         self,
@@ -47,8 +51,13 @@ class CLIPEmbedder(BaseImageEmbedder):
     ):
         super().__init__(model_name_or_path, device)
         try:
-            self.processor = AutoProcessor.from_pretrained(model_name_or_path)
-            self.model = AutoModel.from_pretrained(model_name_or_path)
+            self.processor = AutoProcessor.from_pretrained(
+                model_name_or_path, token=HF_TOKEN
+            )
+            self.model = AutoModel.from_pretrained(
+                model_name_or_path,
+                token=HF_TOKEN,
+            )
             self.model.to(self.device).eval()
         except Exception as e:
             raise RuntimeError(f"Failed to initialize CLIP model: {e}")

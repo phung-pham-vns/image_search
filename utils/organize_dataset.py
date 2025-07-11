@@ -6,10 +6,10 @@ from pathlib import Path
 
 # Input and output folders
 input_root = Path(
-    "/Users/mac/Documents/PHUNGPX/MLOps_practice/durian_retrieval/dataset/pests"
+    "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/split_dataset/train/pest"
 )
 output_root = Path(
-    "/Users/mac/Documents/PHUNGPX/MLOps_practice/durian_retrieval/dataset/processed_pests"
+    "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/split_dataset/train_processed/pest"
 )
 
 output_images = output_root / "images"
@@ -51,8 +51,8 @@ for disease_folder in input_root.iterdir():
                 json.dump(info_data, out_json, indent=2, ensure_ascii=False)
 
 # Sort by the integer prefix before the underscore
-sorted_stats = dict(
-    sorted(disease_stats.items(), key=lambda x: int(x[0].split("_")[0]))
-)
-print(f"Disease Stats: {json.dumps(sorted_stats, indent=4, ensure_ascii=False)}")
+# sorted_stats = dict(
+#     sorted(disease_stats.items(), key=lambda x: int(x[0].split("_")[0]))
+# )
+print(f"Disease Stats: {json.dumps(disease_stats, indent=4, ensure_ascii=False)}")
 print("✅ Done: All images and JSONs have been flattened and renamed with UUIDs.")

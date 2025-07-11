@@ -9,15 +9,7 @@ root_dir = Path(
 )
 
 # Allowed image file extensions
-valid_extensions = [
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".bmp",
-    ".tiff",
-    ".webp",
-    ".avif",
-]
+valid_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", ".avif"]
 
 # Walk through each disease folder
 for disease_folder in root_dir.iterdir():

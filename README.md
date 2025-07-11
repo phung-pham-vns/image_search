@@ -2,33 +2,6 @@
 
 A comprehensive Streamlit application for image similarity search and data management for durian disease and pest classification.
 
-## 🚀 Features
-
-### 📥 Data Ingestion Page
-- **Comprehensive Data Ingestion**: Ingest image data into vector databases with configurable settings
-- **Multiple Categories**: Support for both disease and pest image categories
-- **Batch Processing**: Configurable batch sizes for efficient processing
-- **Real-time Progress Tracking**: Monitor ingestion progress with detailed status updates
-- **Database Integration**: Direct integration with Qdrant vector database
-- **Collection Management**: Automatic collection creation with customizable naming
-
-### ⚙️ Enhanced Sidebar Settings
-- **Vector Store Configuration**: 
-  - Qdrant URI configuration
-  - Collection name prefix customization
-  - Database status monitoring
-- **Embedding Model Selection**: 
-  - 6 pre-configured models with detailed specifications
-  - Model performance and architecture information
-  - Automatic model switching and reloading
-- **Hardware Configuration**: 
-  - Device selection (CPU, CUDA, MPS)
-  - Performance optimization options
-- **Search Settings**: 
-  - Configurable top-k results
-  - Metadata display options
-  - Category-specific search parameters
-
 ### 🤖 Available Embedding Models
 
 | Model | Description | Embedding Size | Model Size | Purpose |
@@ -39,12 +12,6 @@ A comprehensive Streamlit application for image similarity search and data manag
 | **CLIP ViT-L/14** | OpenAI's CLIP ViT-L/14 | 768 | ~1.7GB | High-quality image understanding |
 | **DINOv2 ViT-B/14** | Facebook's DINOv2 Base | 768 | ~1.1GB | Self-supervised image learning |
 | **DINOv2 ViT-L/14** | Facebook's DINOv2 Large | 1024 | ~2.4GB | High-capacity self-supervised learning |
-
-### 📊 Database Management
-- **Real-time Status**: Monitor collection status and vector counts
-- **Direct Access**: Clickable links to Qdrant dashboard and collections
-- **Ingestion Results**: Detailed reports of processed data
-- **Collection URLs**: Direct access to specific collections
 
 ## 🛠️ Installation
 
