@@ -1,6 +1,7 @@
 import os
 import torch
 import httpx
+import open_clip
 import numpy as np
 import torch.nn.functional as F
 
@@ -8,6 +9,7 @@ from PIL import Image
 from typing import Union, Optional
 from transformers import AutoProcessor, AutoModel
 from dotenv import load_dotenv
+from src.constants import EMBEDDING_MODELS
 
 load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -104,7 +106,48 @@ class DINOv2Embedder(BaseImageEmbedder):
         return image_features.cpu().numpy().flatten()
 
 
-class TULIPEmbedder:
+class TULIPEmbedder(BaseImageEmbedder):
+    def __init__(
+        self,
+        model_name_or_path: str,
+        device: Union[str, torch.device] = "cpu",
+    ):
+        super().__init__(model_name_or_path, device)
+        self.model, _, self.processor = open_clip.create_model_and_transforms(
+            model_name_or_path,
+            pretrained=EMBEDDING_MODELS[model_name_or_path]["model_path"],
+        )
+        self.model.eval().to(device)
+        self.device = device
+
+    def preprocess_image(self, image: str | Image.Image) -> Optional[Image.Image]:
+        if isinstance(image, str):
+            try:
+                image = Image.open(image)
+            except Exception as e:
+                print(f"Error processing image at '{image}': {e}")
+                return None
+        # Handle UploadedFile objects from Streamlit
+        elif hasattr(image, "read"):  # UploadedFile has a read method
+            try:
+                image = Image.open(image)
+            except Exception as e:
+                print(f"Error processing uploaded file: {e}")
+                return None
+        image = self.processor(image).unsqueeze(0).to(self.device)
+        return image
+
+    def embed(self, image: str | Image.Image) -> np.ndarray:
+        image = self.preprocess_image(image)
+        if image is None:
+            raise ValueError("Invalid image input for embedding.")
+        with torch.no_grad(), torch.autocast("cuda"):
+            image_features = self.model.encode_image(image)
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+        return image_features.cpu().numpy().flatten()
+
+
+class TULIPAPIEmbedder:
     """
     Central registry of embedding-capable models.
     """
@@ -162,8 +205,8 @@ class ImageEmbedding:
 
 
 if __name__ == "__main__":
-    embedder = ImageEmbedding(model_name_or_path="google/siglip2-base-patch16-224")
-    img = "/Users/mac/Documents/PROJECTS/image_retrieval/dataset/images/processed_dataset/disease/images/0af2a5be-1ef6-420c-b86a-4f46c19b244a.jpeg"  # Replace with your image path
+    embedder = ImageEmbedding(model_name_or_path="TULIP-B-16-224")
+    img = "dataset/images/processed_dataset/disease/images/0af2a5be-1ef6-420c-b86a-4f46c19b244a.jpeg"
     embedding = embedder.embed(img)
     print("Image embedding shape:", embedding.shape)
     print("Embedding:", embedding)

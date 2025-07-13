@@ -34,7 +34,10 @@ def evaluate(
     collection_name_prefix: str = "durian_v2",
 ) -> list[dict]:
     # Initialize the Iamge Searcher
-    embedding_model_path = EMBEDDING_MODELS[embedding_name]["model_path"]
+    if "tulip" in embedding_name.lower():
+        embedding_model_path = embedding_name
+    else:
+        embedding_model_path = EMBEDDING_MODELS[embedding_name]["model_path"]
     config = Config(
         MODEL_NAME_OR_PATH=embedding_model_path,
         COLLECTION_NAME_PREFIX=collection_name_prefix,
@@ -112,10 +115,13 @@ if __name__ == "__main__":
 
     embedding_names = [
         # "SigLIP2 Base",
-        "SigLIP2 Large",
+        # "SigLIP2 Large",
+        # "CLIP ViT-L/14",
         # "CLIP ViT-B/32",
         # "DINOv2 ViT-B/14",
         # "DINOv2 ViT-L/14",
+        "TULIP-B-16-224",
+        "TULIP-so400m-14-384",
     ]
 
     for embedding_name in embedding_names:

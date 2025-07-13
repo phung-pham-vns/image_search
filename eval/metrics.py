@@ -168,7 +168,10 @@ if __name__ == "__main__":
         # "dataset/images/250610_dataset/valid_topK/dinov2_base.json",
         # "dataset/images/250610_dataset/valid_topK/dinov2_large.json",
         # "dataset/images/250610_dataset/valid_topK/siglip2_base_patch16_224.json",
-        "dataset/images/250610_dataset/valid_topK/siglip2_large_patch16_256.json",
+        # "dataset/images/250610_dataset/valid_topK/siglip2_large_patch16_256.json",
+        # "dataset/images/250610_dataset/valid_topK/clip_vit_large_patch14.json",
+        "dataset/images/250610_dataset/valid_topK/tulip_b_16_224.json",
+        "dataset/images/250610_dataset/valid_topK/tulip_so400m_14_384.json",
     ]
     file_paths = [Path(file_path) for file_path in file_paths]
 

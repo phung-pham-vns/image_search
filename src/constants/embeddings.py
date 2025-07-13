@@ -47,4 +47,12 @@ EMBEDDING_MODELS = {
         "purpose": "High-capacity self-supervised image understanding",
         "architecture": "Vision Transformer (ViT-L/14)",
     },
+    "TULIP-so400m-14-384": {
+        "model_path": "models/open_clip/tulip-so400m-14-384.ckpt",
+        "embedding_size": 1152,
+    },
+    "TULIP-B-16-224": {
+        "model_path": "models/open_clip/tulip-B-16-224.ckpt",
+        "embedding_size": 768,
+    },
 }

@@ -309,8 +309,11 @@ def main(
         categories = ["disease", "pest"]
 
     embedding_model = EMBEDDING_MODELS[embedding_name]
-    embedding_model_path = embedding_model["model_path"]
     embedding_size = embedding_model["embedding_size"]
+    if "tulip" in embedding_name.lower():
+        embedding_model_path = embedding_name
+    else:
+        embedding_model_path = embedding_model["model_path"]
 
     config = Config()
     config.MODEL_NAME_OR_PATH = embedding_model_path
@@ -329,10 +332,13 @@ def main(
 if __name__ == "__main__":
     embedding_names = [
         # "SigLIP2 Base",
-        "SigLIP2 Large",
+        # "SigLIP2 Large",
         # "CLIP ViT-B/32",
+        # "CLIP ViT-L/14",
         # "DINOv2 ViT-B/14",
         # "DINOv2 ViT-L/14",
+        "TULIP-B-16-224",
+        "TULIP-so400m-14-384",
     ]
     for embedding_name in embedding_names:
         main(
