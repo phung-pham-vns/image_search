@@ -8,6 +8,8 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
 from os.path import exists
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from collections import defaultdict
 
 
 def precision_at_k(hits, correct_class, k):
@@ -137,6 +139,105 @@ def plot_class_level_precision(df, output_dir):
         plt.close()
 
 
+def plot_confusion_matrix_top1(results, output_dir):
+    """
+    Plot and save the confusion matrix for top-1 predictions.
+    Highlights missing and misclassified classes.
+    """
+    true_labels = []
+    pred_labels = []
+
+    for result in results:
+        if len(result["hits"]) > 1:
+            continue
+        true_class = result["class_name"]
+        top1_pred = result["hits"][0]["class_name"] if result["hits"] else "None"
+
+        true_labels.append(true_class)
+        pred_labels.append(top1_pred)
+
+    # Get sorted list of all unique classes for consistency
+    all_classes = sorted(set(true_labels + pred_labels))
+
+    cm = confusion_matrix(true_labels, pred_labels, labels=all_classes)
+
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=all_classes,
+        yticklabels=all_classes,
+    )
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.title("Confusion Matrix (Top-1 Prediction)")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    out_path = output_dir / "confusion_matrix_top1.png"
+    plt.savefig(out_path)
+    plt.close()
+
+    print(f"📊 Confusion matrix saved to: {out_path.resolve()}")
+
+
+def plot_confusion_matrix_top1_by_category(results, output_dir):
+    """
+    Plot and save confusion matrices for top-1 predictions,
+    separately for each category (e.g., disease, pest).
+    """
+    # Step 1: Organize results by category
+    category_to_labels = defaultdict(lambda: {"true": [], "pred": []})
+
+    for result in results:
+        if len(result["hits"]) > 1:
+            continue
+        category = result["category"]
+        true_class = result["class_name"]
+        pred_class = result["hits"][0]["class_name"] if result["hits"] else "None"
+
+        category_to_labels[category]["true"].append(true_class)
+        category_to_labels[category]["pred"].append(pred_class)
+
+    # Step 2: Generate and save confusion matrix for each category
+    for category, labels in category_to_labels.items():
+        true_labels = labels["true"]
+        pred_labels = labels["pred"]
+
+        # Get all unique classes in this category
+        all_classes = sorted(set(true_labels + pred_labels))
+        cm = confusion_matrix(true_labels, pred_labels, labels=all_classes)
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=all_classes,
+            yticklabels=all_classes,
+        )
+
+        plt.xlabel("Predicted Label")
+        plt.ylabel("True Label")
+        plt.title(f"Confusion Matrix (Top-1) - Category: {category}")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        # Save
+        out_path = (
+            output_dir / f"confusion_matrix_top1_{sanitize_filename(category)}.png"
+        )
+        plt.savefig(out_path)
+        plt.close()
+
+        print(
+            f"📊 Saved confusion matrix for category '{category}' to: {out_path.resolve()}"
+        )
+
+
 def generate_summary_sheet(evaluation_df: pd.DataFrame, xlsx_path: Path):
     """
     Create a summary sheet grouped by model_path and category,
@@ -164,12 +265,12 @@ def generate_summary_sheet(evaluation_df: pd.DataFrame, xlsx_path: Path):
 
 if __name__ == "__main__":
     file_paths = [
-        # "dataset/images/250610_dataset/valid_topK/clip_vit_base_patch32.json",
-        # "dataset/images/250610_dataset/valid_topK/dinov2_base.json",
-        # "dataset/images/250610_dataset/valid_topK/dinov2_large.json",
-        # "dataset/images/250610_dataset/valid_topK/siglip2_base_patch16_224.json",
-        # "dataset/images/250610_dataset/valid_topK/siglip2_large_patch16_256.json",
-        # "dataset/images/250610_dataset/valid_topK/clip_vit_large_patch14.json",
+        "dataset/images/250610_dataset/valid_topK/clip_vit_base_patch32.json",
+        "dataset/images/250610_dataset/valid_topK/dinov2_base.json",
+        "dataset/images/250610_dataset/valid_topK/dinov2_large.json",
+        "dataset/images/250610_dataset/valid_topK/siglip2_base_patch16_224.json",
+        "dataset/images/250610_dataset/valid_topK/siglip2_large_patch16_256.json",
+        "dataset/images/250610_dataset/valid_topK/clip_vit_large_patch14.json",
         "dataset/images/250610_dataset/valid_topK/tulip_b_16_224.json",
         "dataset/images/250610_dataset/valid_topK/tulip_so400m_14_384.json",
     ]
@@ -196,5 +297,9 @@ if __name__ == "__main__":
         generate_summary_sheet(evaluation_df, xlsx_path)
 
         plot_category_level_charts(evaluation_df, output_dir)
+
+        plot_confusion_matrix_top1(results, output_dir)
+
+        plot_confusion_matrix_top1_by_category(results, output_dir)
 
         print(f"\n✔ Evaluation complete! Excel saved to: {xlsx_path.resolve()}")
